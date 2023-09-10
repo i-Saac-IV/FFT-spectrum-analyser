@@ -7,13 +7,16 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define MATRIX_HEIGHT 64  //64
-#define MATRIX_WIDTH 128  //128
+#define MATRIX_HEIGHT 16
+#define MATRIX_WIDTH 32  //watch out this value is important (see NUM_BANDS definition)
+
+#define DISPLAY_HEIGHT 64
+#define DISPLAY_WIDTH 128
 
 /* THESE FOLLOWING NUMBERS ARE IMPORTANT AND IF CHANGED MEANS THE "if statments" NEED CHANGING TOO */
 #define SAMPLES 512
 #define SAMPLING_FREQ 40000  // Hz, must be 40000 or less due to ADC conversion time.
-#define NUM_BANDS 32
+#define NUM_BANDS MATRIX_WIDTH
 
 #define AUDIO_IN_PIN A2
 #define FILTER 500
@@ -38,8 +41,7 @@ int timer_two;
 int timer_three;
 
 #define LED_ARRAY_PIN 7
-//#define NUM_ARRAY_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
-#define NUM_ARRAY_LEDS 16 * 32
+#define NUM_ARRAY_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
 #define MAX_SPECTRUM_BRIGHTNESS 170
 #define LED_TYPE WS2812B
 #define COLOUR_ORDER GRB
@@ -50,13 +52,14 @@ double hue = 0;
 
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
-Adafruit_SSD1306 display(MATRIX_WIDTH, MATRIX_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
 
 #define ACT_LED_PIN 9
 bool state = 1;
 
 
 void setup() {  // setup for core 0, (FastaLED core)
+  delay(1000);
   Serial.begin(19200);
   Serial.println(__FILE__);
   Serial.println(__DATE__);
@@ -65,9 +68,7 @@ void setup() {  // setup for core 0, (FastaLED core)
   pinMode(LED_BUILTIN, OUTPUT);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println("SSD1306 allocation failed");
-    for (;;)
-      ;  // Don't proceed, loop forever
+    Serial.println("OLED not detected");
   }
 
   randomSeed(analogRead(A0));
@@ -89,9 +90,13 @@ void setup() {  // setup for core 0, (FastaLED core)
   digitalWriteFast(LED_BUILTIN, LOW);
 }
 
+int calc_target_led(int x, int y) {
+  x = MATRIX_WIDTH - x if ()
+}
 
-void loop() {  // loop for core 0, (FastaLED core)
-/*
+
+void loop() {  // loop for core 0, (FastaLED and display core)
+               /*
   for (int i = 0; i < NUM_BANDS; i++) {
     Serial.print(VUHeight[i]);
     Serial.print('\t');
@@ -108,8 +113,6 @@ void loop() {  // loop for core 0, (FastaLED core)
     display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
     display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUpeak[band] - 1, (display.width() / NUM_BANDS), 1, SSD1306_WHITE);
   }
-
-
 
   display.display();
   display.clearDisplay();
@@ -167,6 +170,14 @@ void do_FFT_maths() {
   for (int i = 1; i < (SAMPLES / 2); i++) {
     if ((int)vReal[i] < FILTER) vReal[i] = 0;  // basic filter generate the following if statments using excel from here... https://github.com/s-marley/ESP32_FFT_VU
 
+    
+
+
+
+
+
+
+    /*
     //32 bands, 11kHz top band
     if (i <= 1) bandValues[0] += (int)vReal[i];
     if (i > 1 && i <= 2) bandValues[1] += (int)vReal[i];
@@ -200,6 +211,7 @@ void do_FFT_maths() {
     if (i > 95 && i <= 111) bandValues[29] += (int)vReal[i];
     if (i > 111 && i <= 130) bandValues[30] += (int)vReal[i];
     if (i > 130) bandValues[31] += (int)vReal[i];
+    */
   }
 
   for (int band = 0; band < NUM_BANDS; band++) {
