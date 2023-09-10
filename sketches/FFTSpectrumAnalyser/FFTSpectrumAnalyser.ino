@@ -7,8 +7,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define MATRIX_HEIGHT 16
-#define MATRIX_WIDTH 32  //watch out this value is important (see NUM_BANDS definition)
+#define MATRIX_HEIGHT 8
+#define MATRIX_WIDTH 8  //watch out this value is important (see NUM_BANDS definition)
 
 #define DISPLAY_HEIGHT 64
 #define DISPLAY_WIDTH 128
@@ -57,6 +57,7 @@ Adafruit_SSD1306 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
 #define ACT_LED_PIN 9
 bool state = 1;
 
+bool oled_en = 1;
 
 void setup() {  // setup for core 0, (FastaLED core)
   delay(1000);
@@ -69,6 +70,7 @@ void setup() {  // setup for core 0, (FastaLED core)
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("OLED not detected");
+    oled_en = false;
   }
 
   randomSeed(analogRead(A0));
@@ -91,32 +93,32 @@ void setup() {  // setup for core 0, (FastaLED core)
 }
 
 int calc_target_led(int x, int y) {
-  x = MATRIX_WIDTH - x if ()
+  x = MATRIX_WIDTH - x - 1;
+  if (x % 2 == 0) {
+    return (x * MATRIX_HEIGHT) + MATRIX_WIDTH;
+  } else {
+    return (x * MATRIX_HEIGHT) - ;
+  }
 }
 
 
 void loop() {  // loop for core 0, (FastaLED and display core)
-               /*
-  for (int i = 0; i < NUM_BANDS; i++) {
-    Serial.print(VUHeight[i]);
-    Serial.print('\t');
-  }
-  Serial.println();
-  */
-
   fill_solid(led_array, NUM_ARRAY_LEDS, CHSV(hue, 255, 255));
   hue++;
 
   /* The following code is where the animations should go */
 
-  for (int band = 0; band < NUM_BANDS; band++) {
-    display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
-    display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUpeak[band] - 1, (display.width() / NUM_BANDS), 1, SSD1306_WHITE);
-  }
-
-  display.display();
-  display.clearDisplay();
   FastLED.show();
+
+
+  if (oled_en == true) {
+    for (int band = 0; band < NUM_BANDS; band++) {
+      display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
+      display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUpeak[band] - 1, (display.width() / NUM_BANDS), 1, SSD1306_WHITE);
+    }
+    display.display();
+    display.clearDisplay();
+  }
   delay(1000 / FRAMES_PER_SECOND);
 }
 
@@ -170,7 +172,15 @@ void do_FFT_maths() {
   for (int i = 1; i < (SAMPLES / 2); i++) {
     if ((int)vReal[i] < FILTER) vReal[i] = 0;  // basic filter generate the following if statments using excel from here... https://github.com/s-marley/ESP32_FFT_VU
 
-    
+    //8 bands, 11kHz top band
+    if (i <= 2) bandValues[0] += (int)vReal[i];
+    if (i > 2 && i <= 3) bandValues[1] += (int)vReal[i];
+    if (i > 3 && i <= 6) bandValues[2] += (int)vReal[i];
+    if (i > 6 && i <= 13) bandValues[3] += (int)vReal[i];
+    if (i > 13 && i <= 26) bandValues[4] += (int)vReal[i];
+    if (i > 26 && i <= 52) bandValues[5] += (int)vReal[i];
+    if (i > 52 && i <= 105) bandValues[6] += (int)vReal[i];
+    if (i > 105) bandValues[7] += (int)vReal[i];
 
 
 
@@ -219,10 +229,10 @@ void do_FFT_maths() {
 
     if (recentMaxVal < bandValues[band]) {
       recentMaxVal = bandValues[band];
-      VUHeight[band] = map(bandValues[band], 0, recentMaxVal, 0, MATRIX_HEIGHT - 1);  // maps bandValues to the matrix height, dynamically
+      VUHeight[band] = map(bandValues[band], 0, recentMaxVal, 0, DISPLAY_HEIGHT - 1);  // maps bandValues to the matrix height, dynamically
       recentMaxVal *= 2;
     } else {
-      VUHeight[band] = map(bandValues[band], 0, recentMaxVal, 0, MATRIX_HEIGHT - 1);  // maps bandValues to the matrix height, dynamically
+      VUHeight[band] = map(bandValues[band], 0, recentMaxVal, 0, DISPLAY_HEIGHT - 1);  // maps bandValues to the matrix height, dynamically
     }
     bandValues[band] = 0;
 
