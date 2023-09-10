@@ -1,1 +1,1 @@
-# FFTSpectrumAnalyser
+# FFT Spectrum Analyser
