@@ -1,3 +1,26 @@
+/*
+
+Creator: Isaac
+Date: 16-09-2023
+Repo: https://github.com/i-Saac-IV/FFTSpectrumAnalyser
+
+Hiya! This is just some code to control one of those addressable LED matrices.
+Be sure to set size of the matrix, the pin its attached to and the audio in pin.
+
+Pressing the button will change the VU meter animation, long press of the button changes the audio input (green: line in, red: mic, default: line in).
+
+Original hardware:
+Raspberry Pi Pico
+16x16 (and also 16x32) matrix
+I2C 0.96in oled display
+
+inspired by https://github.com/s-marley
+
+*/
+
+/* to do */
+//add in something for when nothing is playing
+//add in a "off" mode
 
 #include <arduinoFFT.h>
 #include <FastLED.h>
@@ -10,19 +33,36 @@
 #include <Arduino.h>
 #include <EasyButton.h>
 
-#define MATRIX_HEIGHT 16
-#define MATRIX_WIDTH 16
+/* Change the following as needed */
 
+#define BUTTON_PIN 2
+#define LED_MAXTRIX_PIN 7
+#define MATRIX_HEIGHT 16
+#define MATRIX_WIDTH 16  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
+#define MAX_MAXTRIX_BRIGHTNESS 200
+#define LED_TYPE WS2812B
+#define COLOUR_ORDER GRB
+#define MIC_IN_PIN A2
+#define AUDIO_IN_PIN A2
+#define FRAMES_PER_SECOND 120
+
+/* For more advanced options */
+
+#define AUDIO_SAMPLE_PERIOD 54  //duration of time (in millis) between each audio sample, this should be as low as possable for "real time" but also depends on the speed of mC (54 min, rp r2040)
+#define DECAY_PERIOD 10         //number of millis between each peak value being "decayed" (on the lcd)
+#define SCREEN_ADDRESS 0x3C
 #define DISPLAY_HEIGHT 64
 #define DISPLAY_WIDTH 128
+#define ACT_LED_PIN 9
+#define LONG_PRESS_LENGTH 1000  //in millis
 
 /* THESE FOLLOWING NUMBERS ARE IMPORTANT AND IF CHANGED MEANS THE "if statments" NEED CHANGING TOO */
 #define SAMPLES 512
 #define SAMPLING_FREQ 40000  // Hz, must be 40000 or less due to ADC conversion time.
 #define NUM_BANDS MATRIX_WIDTH
 
-#define MIC_IN_PIN A2
-#define AUDIO_IN_PIN A2
+/* Gets significantly harder to customize past this point */
+
 #define FILTER 500
 unsigned int sampling_period_us;
 int bandValues[NUM_BANDS];
@@ -38,72 +78,51 @@ arduinoFFT FFT = arduinoFFT(vReal, vImag, SAMPLES, SAMPLING_FREQ);
 #define MAX_VAL_DELAY 50  //in ms
 int timer_one;
 
-#define DECAY_PERIOD 10  //in ms
 int timer_two;
 
-#define AUDIO_SAMPLE_PERIOD 54  //in ms (54 min, rp r2040)
 int timer_three;
 
-#define LED_ARRAY_PIN 7
-#define NUM_ARRAY_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
-#define MAX_SPECTRUM_BRIGHTNESS 200
-#define LED_TYPE WS2812B
-#define COLOUR_ORDER GRB
-CRGB led_array[NUM_ARRAY_LEDS];
+#define NUM_MATRIX_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
+CRGB led_matrix[NUM_MATRIX_LEDS];
 
-#define FRAMES_PER_SECOND 120
 double hue = 0;
-int mode = 0;
+volatile uint8_t mode = 0;
 
 #define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
 
-#define ACT_LED_PIN 9
-bool state = 1;
-
 bool oled_en = 1;
-bool mic_en = 0;
+volatile bool mic_en = 0;
 
-#define BUTTON_PIN 2
-uint8_t numModes = 255;
 EasyButton button(BUTTON_PIN);
 
 void setup() {  // setup for core 0, (FastaLED core)
-  delay(1000);
+  delay(3000);
   Serial.begin(19200);
   Serial.println(__FILE__);
   Serial.println(__DATE__);
   Serial.println(__TIME__);
 
-  pinMode(LED_BUILTIN, OUTPUT);
+  display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println("OLED not detected");
-    oled_en = false;
-  }
+  //FastLED.setMaxPowerInVoltsAndMilliamps(5, 1000); // used to limit led power usage.
+  FastLED.addLeds<LED_TYPE, LED_MAXTRIX_PIN, COLOUR_ORDER>(led_matrix, NUM_MATRIX_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.setBrightness(MAX_MAXTRIX_BRIGHTNESS);
 
-  randomSeed(analogRead(A0));
-
-  //  FastLED.setMaxPowerInVoltsAndMilliamps(5, 1000);
-  FastLED.addLeds<LED_TYPE, LED_ARRAY_PIN, COLOUR_ORDER>(led_array, NUM_ARRAY_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(MAX_SPECTRUM_BRIGHTNESS);
-
-  digitalWriteFast(LED_BUILTIN, HIGH);
-  fill_solid(led_array, NUM_ARRAY_LEDS, CRGB::Red);
+  //led matrix sanitiy check
+  fill_solid(led_matrix, NUM_MATRIX_LEDS, CRGB::Red);
   FastLED.show();
   delay(333);
-  fill_solid(led_array, NUM_ARRAY_LEDS, CRGB::Green);
+  fill_solid(led_matrix, NUM_MATRIX_LEDS, CRGB::Green);
   FastLED.show();
   delay(333);
-  fill_solid(led_array, NUM_ARRAY_LEDS, CRGB::Blue);
+  fill_solid(led_matrix, NUM_MATRIX_LEDS, CRGB::Blue);
   FastLED.show();
   delay(333);
   FastLED.clear();
-  digitalWriteFast(LED_BUILTIN, LOW);
 }
 
-int calc_target_led(int x, int y) {  //matrix mapping
+int calc_target_led(int x, int y) {  // matrix mapping magic
   x = (MATRIX_WIDTH - x) - 1;
   char buffer[40];
   int t;
@@ -112,99 +131,112 @@ int calc_target_led(int x, int y) {  //matrix mapping
   } else {
     t = ((x + 1) * MATRIX_HEIGHT) - (y)-1;
   }
-  if (t > NUM_ARRAY_LEDS - 1) {
+  if (t > NUM_MATRIX_LEDS - 1) {
     sprintf(buffer, "ERROR\tx: %d\ty: %d\tt: %d", x, y, t);
     Serial.println(buffer);
   }
   return t;
 }
 
-void loop() {  // loop for core 0, (FastaLED and display core)
+void loop() {  // loop for core 0, (FastLED and display core)
+
 
   switch (mode) {
     case 0:
-      intensity();
+      intensity(0, 0);
       break;
     case 1:
-      solid_hue();
+      intensity(hue, 255);
       break;
     case 2:
-      rainbow_bands();
+      solid_colour(hue);
+      break;
+    case 3:
+      rainbow_bands(0);
+      break;
+    case 4:
+      rainbow_bands(hue);
+      break;
+    case 5:
+      rainbow_vals(0);
+      break;
+    case 6:
+      rainbow_vals(hue);
       break;
     default:
       mode = 0;
       break;
   }
 
-
-  if (oled_en == true) {
-    for (int band = 0; band < NUM_BANDS; band++) {
-      display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
-      display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUpeak[band] - 1, (display.width() / NUM_BANDS), 1, SSD1306_WHITE);
-    }
-    display.display();
-    display.clearDisplay();
+  // update the oled screen
+  for (int band = 0; band < NUM_BANDS; band++) {
+    display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
+    display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUpeak[band] - 1, (display.width() / NUM_BANDS), 1, SSD1306_WHITE);
   }
+  display.display();
+  display.clearDisplay();
 
-  hue += 0.2;
+
+  hue -= 0.1;
   FastLED.show();
   delay(1000 / FRAMES_PER_SECOND);
 }
 
-void rainbow_bands() {
+void rainbow_vals(int h) {
   for (int band = 0; band < NUM_BANDS; band++) {
-    hue = (255 / NUM_BANDS) * band;
-    led_array[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CRGB::White;
+    led_matrix[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CRGB::White;
     for (int val = 0; val < (int)map(VUHeight[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT); val++) {
-      led_array[calc_target_led(band, val)] = CHSV(hue, 255, 255);
+      int hue2 = ((255 / MATRIX_HEIGHT) * val) + h;
+      led_matrix[calc_target_led(band, val)] = CHSV(hue2, 255, 255);
     }
   }
-  fadeToBlackBy(led_array, NUM_ARRAY_LEDS, 15);
+  fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
 }
 
-void intensity() {
+void rainbow_bands(int h) {
   for (int band = 0; band < NUM_BANDS; band++) {
-    led_array[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CRGB::White;
+    int hue2 = (255 / NUM_BANDS) * band + h;
+    led_matrix[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CRGB::White;
+    for (int val = 0; val < (int)map(VUHeight[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT); val++) {
+      led_matrix[calc_target_led(band, val)] = CHSV(hue2, 255, 255);
+    }
+  }
+  fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
+}
+
+void intensity(int h, int s) {
+  int hue2;
+  int hue3;
+  for (int band = 0; band < NUM_BANDS; band++) {
+    hue3 = ((255 / NUM_BANDS) * band) + h;
+    led_matrix[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CHSV(hue3, s, 255);
     for (int val = 0; val < (int)map(VUHeight[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT); val++) {
       if (val < (MATRIX_HEIGHT / 2) - 1) {
-        hue = 100;  //green
+        hue2 = 100;  //green
       } else if (val < (MATRIX_HEIGHT / 4 * 3) - 1) {
-        hue = 60;  //yellow
+        hue2 = 60;  //yellow
       } else if (val < (MATRIX_HEIGHT / 8 * 7) - 1) {
-        hue = 30;  //orange
+        hue2 = 30;  //orange
       } else {
-        hue = 0;  //red
+        hue2 = 0;  //red
       }
-      led_array[calc_target_led(band, val)] = CHSV(hue, 255, 255);
+      led_matrix[calc_target_led(band, val)] = CHSV(hue2, 255, 255);
     }
   }
-  fadeToBlackBy(led_array, NUM_ARRAY_LEDS, 15);
+  fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
 }
 
-void solid_hue() {
+void solid_colour(int h) {
   for (int band = 0; band < NUM_BANDS; band++) {
-    led_array[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] += CHSV(hue, 255, 255);
+    led_matrix[calc_target_led(band, (int)map(VUpeak[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT))] = CHSV(h, 255, 255);
     for (int val = 0; val < (int)map(VUHeight[band], 0, DISPLAY_HEIGHT, 0, MATRIX_HEIGHT); val++) {
-      led_array[calc_target_led(band, val)] = CHSV(hue + 128, 255, 255);
+      led_matrix[calc_target_led(band, val)] = CHSV(h + 128, 255, 255);
     }
   }
-  fadeToBlackBy(led_array, NUM_ARRAY_LEDS, 25);
+  fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
 }
 
-
-void buttonPressed() {
-  mode++;
-  Serial.print("mode:\t");
-  Serial.println(mode - 1);
-}
-
-void longPress() {
-  fill_solid(led_array, NUM_ARRAY_LEDS, CRGB::Green);
-  FastLED.show();
-  mic_en = !mic_en;
-  Serial.print("mic_en:\t");
-  Serial.println(mic_en);
-}
+/* The folling code is all run on the 2nd core (core 1) */
 
 void setup1() {  // setup for core 1, (FFT core)
   sampling_period_us = round(1000000 * (1.0 / SAMPLING_FREQ));
@@ -212,7 +244,7 @@ void setup1() {  // setup for core 1, (FFT core)
 
   button.begin();
   button.onPressed(buttonPressed);
-  button.onPressedFor(1000, longPress);
+  button.onPressedFor(LONG_PRESS_LENGTH, longPress);
 }
 
 void loop1() {  // loop for core 1, (FFT core)
@@ -266,7 +298,7 @@ void do_FFT_maths() {
   FFT.ComplexToMagnitude();
 
   for (int i = 1; i < (SAMPLES / 2); i++) {
-    if ((int)vReal[i] < FILTER) vReal[i] = 0;  // basic filter generate the following if statments using excel from here... https://github.com/s-marley/ESP32_FFT_VU
+    if ((int)vReal[i] < FILTER) vReal[i] = 0;  // basic filter generate the following if statments using excel from here: https://github.com/s-marley/ESP32_FFT_VU
 
     if (MATRIX_WIDTH == 2) {
       //2 bands, 11kHz top band
@@ -399,4 +431,23 @@ void do_FFT_maths() {
 
     if (VUpeak[band] < VUHeight[band]) VUpeak[band] = VUHeight[band];  //update peakVU value
   }
+}
+
+void buttonPressed() {
+  mode++;
+  Serial.print("mode:\t");
+  Serial.println(mode - 1);
+}
+
+void longPress() {
+  mic_en = !mic_en;
+  if (mic_en) {
+    fill_solid(led_matrix, NUM_MATRIX_LEDS, CRGB::Green);
+    FastLED.show();
+  } else {
+    fill_solid(led_matrix, NUM_MATRIX_LEDS, CRGB::Red);
+    FastLED.show();
+  }
+  Serial.print("mic_en:\t");
+  Serial.println(mic_en);
 }
