@@ -24,12 +24,9 @@ I2C 0.96in oled display
 #include <arduinoFFT.h>
 #include <FastLED.h>
 
-#include <SPI.h>
-#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#include <Arduino.h>
 #include <EasyButton.h>
 
 /* Change the following as needed */
