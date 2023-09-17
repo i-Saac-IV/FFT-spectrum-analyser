@@ -8,7 +8,9 @@ I was unhappy with some of the VU metres out there, so decided to make my own.
 - Easy animation and input switches
   - Single press mode button to cycle VU metre style
   - Long press mode button to cycle audio input method
+    
     Green -> Mic
+    
     Red -> Line
 
 ## To do
