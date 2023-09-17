@@ -4,10 +4,15 @@ I was unhappy with some of the VU metres out there, so decided to make my own.
 ## Features
 - Supports both mic and line in audio inputs
 - Fully addressable RGB led panel
-- Easy to add your own custom animations (with some basic coding knowledge
+- Easy to add your own custom animations (with some basic coding knowledge)
+- Easy animation and input switches
+  - Single press mode button to cycle VU metre style
+  - Long press mode button to cycle audio input method
+    Green -> Mic
+    Red -> Line
 
 ## To do
-- [ ] Add in a "sleep" mode that just plays animations.
+- [ ] Add in a "sleep" mode that just plays animations
 - [ ] Add in a display off function
 
 # Usage
