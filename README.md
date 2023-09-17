@@ -59,3 +59,5 @@ This project uses the following third-party libraries:
 - **FastLED** (MIT License): https://github.com/FastLED/FastLED
 - **Adafruit_SSD1306** (BSD License): https://github.com/adafruit/Adafruit_SSD1306
 - **EasyButton** (MIT License): https://github.com/evert-arias/EasyButton
+
+Contact me should any of this be wrong.
