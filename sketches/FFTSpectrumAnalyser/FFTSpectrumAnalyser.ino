@@ -297,7 +297,7 @@ void do_FFT_maths() {
   FFT.ComplexToMagnitude();
 
   for (int i = 1; i < (SAMPLES / 2); i++) {
-    if ((int)vReal[i] < FILTER) vReal[i] = 0;  // basic filter generate the following if statments using excel from here: https://github.com/s-marley/ESP32_FFT_VU
+    if ((int)vReal[i] < FILTER) vReal[i] = 0;  // filtering FFT output into band values
 
     if (MATRIX_WIDTH == 2) {
       //2 bands, 11kHz top band
