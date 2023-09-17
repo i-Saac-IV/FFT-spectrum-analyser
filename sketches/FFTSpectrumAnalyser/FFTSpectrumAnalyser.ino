@@ -1,6 +1,6 @@
 /*
 
-Creator: Isaac
+Creator: Isaac Pawley
 Date: 16-09-2023
 Repo: https://github.com/i-Saac-IV/FFTSpectrumAnalyser
 
@@ -14,13 +14,12 @@ Raspberry Pi Pico
 16x16 (and also 16x32) matrix
 I2C 0.96in oled display
 
-inspired by https://github.com/s-marley
-
 */
 
 /* to do */
 //add in something for when nothing is playing
 //add in a "off" mode
+//add copyright info
 
 #include <arduinoFFT.h>
 #include <FastLED.h>
