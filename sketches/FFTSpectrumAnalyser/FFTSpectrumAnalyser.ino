@@ -19,7 +19,6 @@ I2C 0.96in oled display
 /* to do */
 //add in something for when nothing is playing
 //add in a "off" mode
-//add copyright info
 
 #include <arduinoFFT.h>
 #include <FastLED.h>
