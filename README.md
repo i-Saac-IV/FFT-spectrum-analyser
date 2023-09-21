@@ -14,8 +14,8 @@ I was unhappy with some of the VU metres out there, so decided to make my own.
     Red -> Line
 
 ## To do
-- [ ] Add in a "sleep" mode that just plays animations
-- [ ] Add in a display off function
+- [x] Add in a "sleep" mode that just plays animations
+- [x] Add in a display off function
 
 # Usage
 ## Hardware and setup
@@ -46,12 +46,14 @@ Then ensure that the following code describes the hardware in the best possible 
 #define LED_MAXTRIX_PIN 7
 #define MATRIX_HEIGHT 16
 #define MATRIX_WIDTH 16  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
-#define MAX_MAXTRIX_BRIGHTNESS 200
+#define MAX_MAXTRIX_BRIGHTNESS 255
 #define LED_TYPE WS2812B
 #define COLOUR_ORDER GRB
 #define MIC_IN_PIN A2
 #define AUDIO_IN_PIN A2
 #define FRAMES_PER_SECOND 120
+#define TIME_OUT 60         //in seconds
+#define POWER_OFF_MATIRX 5  //in minutes
 ```
 Hit upload and you should be good to go!
 
