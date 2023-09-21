@@ -17,8 +17,6 @@ I2C 0.96in oled display
 */
 
 /* to do */
-//add in something for when nothing is playing
-//add in a "off" mode
 
 #include <arduinoFFT.h>
 #include <FastLED.h>
@@ -34,12 +32,14 @@ I2C 0.96in oled display
 #define LED_MAXTRIX_PIN 7
 #define MATRIX_HEIGHT 16
 #define MATRIX_WIDTH 16  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
-#define MAX_MAXTRIX_BRIGHTNESS 200
+#define MAX_MAXTRIX_BRIGHTNESS 255
 #define LED_TYPE WS2812B
 #define COLOUR_ORDER GRB
 #define MIC_IN_PIN A2
 #define AUDIO_IN_PIN A2
 #define FRAMES_PER_SECOND 120
+#define TIME_OUT 60         //in seconds
+#define POWER_OFF_MATIRX 5  //in minutes
 
 /* For more advanced options */
 
@@ -71,11 +71,13 @@ unsigned long newTime;
 arduinoFFT FFT = arduinoFFT(vReal, vImag, SAMPLES, SAMPLING_FREQ);
 
 #define MAX_VAL_DELAY 50  //in ms
-int timer_one;
+unsigned long timer_one;
 
-int timer_two;
+unsigned long timer_two;
 
-int timer_three;
+unsigned long timer_three;
+
+unsigned long lastSound;
 
 #define NUM_MATRIX_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
 CRGB led_matrix[NUM_MATRIX_LEDS];
@@ -134,34 +136,45 @@ int calc_target_led(int x, int y) {  // matrix mapping magic
 }
 
 void loop() {  // loop for core 0, (FastLED and display core)
-
-
-  switch (mode) {
-    case 0:
-      intensity(0, 0);
-      break;
-    case 1:
-      intensity(hue, 255);
-      break;
-    case 2:
-      solid_colour(hue);
-      break;
-    case 3:
-      rainbow_bands(0);
-      break;
-    case 4:
-      rainbow_bands(hue);
-      break;
-    case 5:
-      rainbow_vals(0);
-      break;
-    case 6:
-      rainbow_vals(hue);
-      break;
-    default:
-      mode = 0;
-      break;
+  if (lastSound + (POWER_OFF_MATIRX * 60 * 1000) < millis()) {
+    fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
+  } else {
+    if (lastSound + (TIME_OUT * 1000) < millis()) {
+      confetti(hue);
+      hue++;
+    } else {
+      switch (mode) {
+        case 0:
+          intensity(0, 0);
+          break;
+        case 1:
+          scroll();
+          break;
+        case 2:
+          intensity(hue, 255);
+          break;
+        case 3:
+          solid_colour(hue);
+          break;
+        case 4:
+          rainbow_bands(0);
+          break;
+        case 5:
+          rainbow_bands(hue);
+          break;
+        case 6:
+          rainbow_vals(0);
+          break;
+        case 7:
+          rainbow_vals(hue);
+          break;
+        default:
+          mode = 0;
+          break;
+      }
+    }
   }
+
 
   // update the oled screen
   for (int band = 0; band < NUM_BANDS; band++) {
@@ -174,6 +187,25 @@ void loop() {  // loop for core 0, (FastLED and display core)
 
   hue -= 0.1;
   FastLED.show();
+  delay(1000 / FRAMES_PER_SECOND);
+}
+
+void confetti(int h) {
+  fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 10);
+  int pos = random16(NUM_MATRIX_LEDS);
+  led_matrix[pos] += CHSV(h + random(64), 200, 255);
+  delay(1000 / FRAMES_PER_SECOND);
+}
+
+void scroll() {
+  for (int band = 0; band < NUM_BANDS; band++) {
+    for (int i = MATRIX_HEIGHT; i > 1; i--) {
+      led_matrix[calc_target_led(band, i - 1)] = led_matrix[calc_target_led(band, i - 2)];
+    }
+  }
+  for (int band = 0; band < NUM_BANDS; band++) {
+    led_matrix[calc_target_led(band, 0)] = CHSV(map(VUHeight[band], 0, DISPLAY_HEIGHT, 100, 0), 255, map(VUpeak[band], 0, DISPLAY_HEIGHT, 75, 255));
+  }
   delay(1000 / FRAMES_PER_SECOND);
 }
 
@@ -247,8 +279,15 @@ void loop1() {  // loop for core 1, (FFT core)
 
   if (timer_one + MAX_VAL_DELAY < millis()) {
     recentMaxVal *= 0.90;
-    if (recentMaxVal < FILTER * 2) recentMaxVal = FILTER * 2;
+    if (recentMaxVal < FILTER * 2) {
+      recentMaxVal = FILTER * 2;
+    } else {
+      lastSound = millis();
+    }
     timer_one = millis();
+    char buffer[80];
+    sprintf(buffer, "current millis:%d\tlastSound:%d\trecentMaxVal:%d", millis(), lastSound, recentMaxVal);
+    Serial.println(buffer);
   }
 
   if (timer_two + DECAY_PERIOD < millis()) {
