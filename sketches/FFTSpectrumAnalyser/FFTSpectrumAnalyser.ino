@@ -21,8 +21,10 @@ I2C 0.96in oled display
 #include <arduinoFFT.h>
 #include <FastLED.h>
 
+/*
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+*/
 
 #include <EasyButton.h>
 
@@ -31,7 +33,7 @@ I2C 0.96in oled display
 #define BUTTON_PIN 2
 #define LED_MAXTRIX_PIN 7
 #define MATRIX_HEIGHT 16
-#define MATRIX_WIDTH 16  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
+#define MATRIX_WIDTH 32  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
 #define MAX_MAXTRIX_BRIGHTNESS 255
 #define LED_TYPE WS2812B
 #define COLOUR_ORDER GRB
@@ -85,8 +87,13 @@ CRGB led_matrix[NUM_MATRIX_LEDS];
 double hue = 0;
 volatile uint8_t mode = 0;
 
+/* Anitmation maths stuff */
+int blurConvolutionMap[][2] = { { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 }, { 0, 0 }, { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 } };
+
+/*
 #define OLED_RESET -1
 Adafruit_SSD1306 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
+*/
 
 bool oled_en = 1;
 volatile bool mic_en = 0;
@@ -100,7 +107,7 @@ void setup() {  // setup for core 0, (FastaLED core)
   Serial.println(__DATE__);
   Serial.println(__TIME__);
 
-  display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  //display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
 
   //FastLED.setMaxPowerInVoltsAndMilliamps(5, 1000); // used to limit led power usage.
   FastLED.addLeds<LED_TYPE, LED_MAXTRIX_PIN, COLOUR_ORDER>(led_matrix, NUM_MATRIX_LEDS).setCorrection(TypicalLEDStrip);
@@ -143,7 +150,8 @@ void loop() {  // loop for core 0, (FastLED and display core)
       confetti(hue);
       hue++;
     } else {
-      switch (mode) {
+      mode = 100;
+       switch (mode) {
         case 0:
           intensity(0, 0);
           break;
@@ -169,13 +177,15 @@ void loop() {  // loop for core 0, (FastLED and display core)
           rainbow_vals(hue);
           break;
         default:
-          mode = 0;
+          confetti(random(130, 170));
+          blur(1);
+          //mode = 0;
           break;
       }
     }
   }
 
-
+  /* 
   // update the oled screen
   for (int band = 0; band < NUM_BANDS; band++) {
     display.fillRect((display.width() / NUM_BANDS) * band, display.height() - VUHeight[band] - 1, (display.width() / NUM_BANDS), VUHeight[band], SSD1306_WHITE);
@@ -183,11 +193,54 @@ void loop() {  // loop for core 0, (FastLED and display core)
   }
   display.display();
   display.clearDisplay();
-
+*/
 
   hue -= 0.1;
   FastLED.show();
   delay(1000 / FRAMES_PER_SECOND);
+}
+
+void blur(uint8_t radius) {
+  CRGB ref[NUM_MATRIX_LEDS] = led_matrix;
+  switch (radius) {
+    case 1:
+      for (int x = 0; x < MATRIX_WIDTH; x++) {
+        for (int y = 0; y < MATRIX_HEIGHT; y++) {
+          int targLED = calc_target_led(x, y);
+          int xCon;
+          int yCon;
+          int targCon;
+          double newR;
+          double newG;
+          double newB;
+          for (int i = 0; i < 9; i++) {
+            if (x + blurConvolutionMap[i][0] < 0) {
+              xCon = x;
+            } else if (x + blurConvolutionMap[i][0] > MATRIX_WIDTH - 1) {
+              xCon = x;
+            } else {
+              xCon = x + blurConvolutionMap[i][0];
+            }
+            if (y + blurConvolutionMap[i][1] < 0) {
+              yCon = y;
+            } else if (y + blurConvolutionMap[i][1] > MATRIX_HEIGHT - 1) {
+              yCon = y;
+            } else {
+              yCon = y + blurConvolutionMap[i][1];
+            }
+            targCon = calc_target_led(xCon, yCon);
+            newR += ref[targCon].r * 0.11111;
+            newG += ref[targCon].g * 0.11111;
+            newB += ref[targCon].b * 0.11111;
+          }
+          led_matrix[targLED] = CRGB(newR, newG, newB);
+        }
+      }
+      break;
+    default:
+      // do nothing
+      break;
+  }
 }
 
 void confetti(int h) {
