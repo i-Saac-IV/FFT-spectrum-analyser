@@ -200,6 +200,19 @@ void loop() {  // loop for core 0, (FastLED and display core)
   delay(1000 / FRAMES_PER_SECOND);
 }
 
+void draw_FP_line(double startX, double startY, double endX, double endY) {
+  // y = mx + c
+  // y - y1 = (x - x1)m + c
+  // c = y - mx
+  uint8_t subpixelDivisions = 10;
+  double gradient = (endY - startY) / (endX - startX);
+  double yIntercept = endY - gradient * endX;
+  for (double x = startX; x <= endX; x += 1 / subpixelDivisions) {
+    double y = gradient * x + yIntercept;
+    
+  }
+}
+
 void blur(uint8_t radius) {
   CRGB ref[NUM_MATRIX_LEDS] = led_matrix;
   switch (radius) {
