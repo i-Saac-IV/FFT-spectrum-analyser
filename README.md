@@ -20,9 +20,9 @@ I was unhappy with some of the VU metres out there, so decided to make my own.
 # Usage
 ## Hardware and setup
 Here is a very vague list of things you'll need to recreate this:
-- [Raspberry Pi Pico]((https://www.raspberrypi.com/products/raspberry-pi-pico/)https://www.raspberrypi.com/products/raspberry-pi-pico/)
-- FastLED compatible matrix (something like [this]((https://www.adafruit.com/product/2547)https://www.adafruit.com/product/2547))
-- Some common components to deal with the audio signal **and/or** a microphone (ideally [this one]((https://www.adafruit.com/product/1713)https://www.adafruit.com/product/1713) but [this one]((https://www.adafruit.com/product/1063)https://www.adafruit.com/product/1063) also works)
+- [Raspberry Pi Pico](https://www.raspberrypi.com/products/raspberry-pi-pico/)
+- FastLED compatible matrix (something like [this](https://www.adafruit.com/product/2547))
+- Some common components to deal with the audio signal **and/or** a microphone (ideally [this one](https://www.adafruit.com/product/1713) but [this one](https://www.adafruit.com/product/1063) also works)
 - Access to a 3d printer for the frame
 - Access to a laser cutter for the interlocking grid (or a lot of spare time and a craft knife)
 
