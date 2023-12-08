@@ -16,6 +16,8 @@ I was unhappy with some of the VU metres out there, so decided to make my own.
 ## To do
 - [x] Add in a "sleep" mode that just plays animations
 - [x] Add in a display off function
+- [ ] Add a ractive raindrop animation
+- [ ] Add a blur funtion?? 
 
 # Usage
 ## Hardware and setup
@@ -55,7 +57,17 @@ Then ensure that the following code describes the hardware in the best possible 
 #define TIME_OUT 60         //in seconds
 #define POWER_OFF_MATIRX 5  //in minutes
 ```
-Hit upload and you should be good to go!
+
+> [!IMPORTANT]
+> Be sure you have added the correct board to the board manager within the arduino program, to check navigate to the following
+>
+> __File -> Preferences -> Additional board manager URLs:__
+>
+> Add this URL to it: [https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json](https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json)
+>
+> Then open the baords manager and serach _Pico_ install the board package made by Earle F. Philhower.
+
+Ensure you have the correct board and port selected hit upload and you should be good to go!
 
 ## Bugs fixes and updates
 Once I'm happy with the state of this project, it will likely not be updated much. So updates past this point will be very sporadic.
