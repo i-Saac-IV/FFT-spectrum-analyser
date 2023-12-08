@@ -66,6 +66,8 @@ Then ensure that the following code describes the hardware in the best possible 
 > Add this URL to it: [https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json](https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json)
 >
 > Then open the baords manager and serach _Pico_ install the board package made by Earle F. Philhower.
+> 
+> ![Board Manager](/images/boards-manager.png)
 
 Ensure you have the correct board and port selected hit upload and you should be good to go!
 
