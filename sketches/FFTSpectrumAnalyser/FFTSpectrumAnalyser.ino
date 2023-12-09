@@ -40,6 +40,7 @@ I2C 0.96in oled display
 #define MIC_IN_PIN A1
 #define AUDIO_IN_PIN A2
 #define FRAMES_PER_SECOND 120
+#define CONWAY_FPS 3
 #define TIME_OUT 3          //in seconds
 #define POWER_OFF_MATIRX 5  //in minutes
 
@@ -81,6 +82,8 @@ unsigned long timer_three;
 
 unsigned long lastSound;
 
+unsigned long lastFrame;
+
 #define NUM_MATRIX_LEDS (MATRIX_HEIGHT * MATRIX_WIDTH)
 CRGB led_matrix[NUM_MATRIX_LEDS];
 
@@ -88,7 +91,10 @@ double hue = 0;
 volatile uint8_t mode = 0;
 
 /* Anitmation maths stuff */
-
+bool resetGameOfLife = true;
+int neighbourMap[][2] = { { -1, -1 }, { -1, 0 }, { -1, 1 }, { 0, -1 }, { 0, 1 }, { 1, -1 }, { 1, 0 }, { 1, 1 } };
+bool currentCellState[NUM_MATRIX_LEDS] = {};
+bool previousCellState[NUM_MATRIX_LEDS] = {};
 
 #define OLED_RESET -1
 Adafruit_SSD1306 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, OLED_RESET);
@@ -105,6 +111,8 @@ void setup() {  // setup for core 0, (FastaLED core)
   Serial.println(__FILE__);
   Serial.println(__DATE__);
   Serial.println(__TIME__);
+
+  randomSeed(analogRead(A0));
 
   display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
 
@@ -126,17 +134,18 @@ void setup() {  // setup for core 0, (FastaLED core)
 }
 
 int calc_target_led(int x, int y) {  // matrix mapping magic
+  if (x < 0 || y < 0 || x > MATRIX_WIDTH - 1 || y > MATRIX_HEIGHT - 1) {
+    char buffer[40];
+    sprintf(buffer, "MAPPING ERROR\tx: %d\ty: %d\t", x, y);
+    //Serial.println(buffer);
+    return -1;
+  }
   x = (MATRIX_WIDTH - x) - 1;
-  char buffer[40];
   int t;
   if (x % 2 == 0) {
     t = (x * MATRIX_HEIGHT) + (y);
   } else {
     t = ((x + 1) * MATRIX_HEIGHT) - (y)-1;
-  }
-  if (t > NUM_MATRIX_LEDS - 1) {
-    sprintf(buffer, "ERROR\tx: %d\ty: %d\tt: %d", x, y, t);
-    Serial.println(buffer);
   }
   return t;
 }
@@ -147,9 +156,34 @@ void loop() {  // loop for core 0, (FastLED and display core)
     fadeToBlackBy(led_matrix, NUM_MATRIX_LEDS, 15);
   } else {
     if (lastSound + (TIME_OUT * 1000) < millis()) {
-      confetti(hue);
-      hue++;
+      if (mic_en) {
+        if (resetGameOfLife) {
+          resetGameOfLife = false;
+          random_fill();
+        }
+
+        for (int i = 0; i < NUM_MATRIX_LEDS; i++) {
+          if (currentCellState[i] == true) {
+            led_matrix[i] = CRGB::White;
+          } else if (previousCellState[i] == true) {
+            previousCellState[i] = false;
+            led_matrix[i] = CRGB::Red;
+          } else {
+            fadeToBlackBy(&led_matrix[i], 1, 15);
+          }
+        }
+
+        if (lastFrame + (1000 / CONWAY_FPS) < millis()) {
+          lastFrame = millis();
+          next_conway_frame();
+        }
+
+      } else {
+        confetti(hue);
+        hue++;
+      }
     } else {
+      resetGameOfLife = true;
       switch (mode) {
         case 0:
           intensity(0, 0);
@@ -158,7 +192,7 @@ void loop() {  // loop for core 0, (FastLED and display core)
           scroll(85, 0);
           break;
         case 2:
-          scroll(85, 200);
+          scroll(85 + (int)hue, 0 + (int)hue);
           break;
         case 3:
           intensity(hue, 255);
@@ -186,11 +220,55 @@ void loop() {  // loop for core 0, (FastLED and display core)
   }
   // update_OLED();
 
-
-
   hue -= 0.1;
+  if (hue < 0 || hue > 255) hue = 255.0;
   FastLED.show();
   delay(1000 / FRAMES_PER_SECOND);
+}
+
+void next_conway_frame() {
+  for (int i = 0; i < NUM_MATRIX_LEDS; i++) {
+    previousCellState[i] = currentCellState[i];
+  }
+  for (int y = 0; y < MATRIX_HEIGHT; y++) {
+    for (int x = 0; x < MATRIX_WIDTH; x++) {
+      int target = calc_target_led(x, y);
+      int neighbour;
+      int xNeighbour;
+      int yNeighbour;
+      int aliveCount = 0;
+
+      for (int i = 0; i < 8; i++) {
+        xNeighbour = x + neighbourMap[i][0];
+        yNeighbour = y + neighbourMap[i][1];
+
+        neighbour = calc_target_led(xNeighbour, yNeighbour);
+        if (neighbour != -1) {
+          if (previousCellState[neighbour] == true) {
+            aliveCount++;
+          }
+        }
+      }
+
+      if (previousCellState[target] == false && aliveCount == 3) {
+        currentCellState[target] = true;
+      } else if (previousCellState[target] == true && (aliveCount == 2 || aliveCount == 3)) {
+        currentCellState[target] = true;
+      } else {
+        currentCellState[target] = false;
+      }
+    }
+  }
+}
+
+void random_fill() {
+  for (int i = 0; i < NUM_MATRIX_LEDS; i++) {
+    if (random(0, 2) == 0) {
+      currentCellState[i] = true;
+    } else {
+      currentCellState[i] = false;
+    }
+  }
 }
 
 void lerpHSV(CHSV hsv1, CHSV hsv2, float t, CRGB &lerpRGB) {
@@ -199,7 +277,7 @@ void lerpHSV(CHSV hsv1, CHSV hsv2, float t, CRGB &lerpRGB) {
 
   hsv2rgb_rainbow(hsv1, rgb1);
   hsv2rgb_rainbow(hsv2, rgb2);
-  
+
   lerpRGB.red = int(rgb1.red + (t * (rgb2.red - rgb1.red)));
   lerpRGB.green = int(rgb1.green + (t * (rgb2.green - rgb1.green)));
   lerpRGB.blue = int(rgb1.blue + (t * (rgb2.blue - rgb1.blue)));
@@ -317,9 +395,11 @@ void loop1() {  // loop for core 1, (FFT core)
       lastSound = millis();
     }
     timer_one = millis();
+    /*
     char buffer[80];
     sprintf(buffer, "current millis:%d\tlastSound:%ld\trecentMaxVal:%d", millis(), lastSound, recentMaxVal);
     Serial.println(buffer);
+    */
   }
 
   if (timer_two + DECAY_PERIOD < millis()) {
@@ -504,7 +584,7 @@ void do_FFT_maths() {
 void buttonPressed() {
   mode++;
   Serial.print("mode:\t");
-  Serial.println(mode - 1);
+  Serial.println(mode);
 }
 
 void longPress() {
