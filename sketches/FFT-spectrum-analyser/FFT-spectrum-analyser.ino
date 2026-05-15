@@ -33,7 +33,7 @@ I2C 0.96in oled display
 #define BUTTON_PIN 2
 #define LED_MAXTRIX_PIN 7
 #define MATRIX_HEIGHT 16
-#define MATRIX_WIDTH 32  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
+#define MATRIX_WIDTH 16  //also dictates the number of VU bands supports values of (2, 4, 8, 10, 16, 20 and 32) without modifying code
 #define MAX_MAXTRIX_BRIGHTNESS 255
 #define LED_TYPE WS2812B
 #define COLOUR_ORDER GRB
@@ -71,7 +71,7 @@ volatile int VUpeak[NUM_BANDS];
 double vReal[SAMPLES];
 double vImag[SAMPLES];
 unsigned long newTime;
-arduinoFFT FFT = arduinoFFT(vReal, vImag, SAMPLES, SAMPLING_FREQ);
+ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, SAMPLING_FREQ);
 
 #define MAX_VAL_DELAY 50  //in ms
 unsigned long timer_one;
@@ -440,10 +440,10 @@ void take_samples() {
 
 void do_FFT_maths() {
   // Compute FFT
-  FFT.DCRemoval();
-  FFT.Windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  FFT.Compute(FFT_FORWARD);  //this takes ages
-  FFT.ComplexToMagnitude();
+  FFT.dcRemoval();
+  FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  FFT.compute(FFT_FORWARD);  //this takes ages
+  FFT.complexToMagnitude();
 
   for (int i = 1; i < (SAMPLES / 2); i++) {
     if ((int)vReal[i] < FILTER) vReal[i] = 0;  // filtering FFT output into band values
