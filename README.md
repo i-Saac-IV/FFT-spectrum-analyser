@@ -6,9 +6,13 @@ A real-time audio visualiser using FFT-based frequency analysis.
 - [Fixes and Updates](#fixes-and-updates)
 - [Pictures and Video](#pictures-and-video)
 - [Hardware and Setup](#hardware-and-setup)
+  - [Laser Cut Housing](#laser-cut-housing)
+  - [3D Printed Framing](#3d-printed-framing)
+  - [LED Grid](#led-grid)
   - [Printed Circuit Board](#printed-circuit-board)
   - [Code](#code)
     - [Dependencies](#dependencies)
+    - [Code Upload](#code-upload)
 - [Copyright and Licencing](#copyright-and-licencing)
 - [Contact](#contact)
 
@@ -56,6 +60,9 @@ The 3D printing files can be found [here](/assets/3d). You will need; a top, a b
 
 ## LED Grid
 The LED panel sits behind the white diffuser and a pixel grid, this grid stops the light from one pixel bleeding into its neightbours. I would recommend getting this grid laser cut.
+
+## Printed Circuit Board
+The gerber files for PCB manufacturing can be found [here](/assets/pcb/FFT-spectrum-analyser_board.zip).
 
 ## Code
 ### Dependencies
